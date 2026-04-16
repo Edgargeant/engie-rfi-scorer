@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ENGIE · RFI AIMS Scorer</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+:root {
+  --navy: #002D62;
+  --blue: #00AAFF;
+  --teal: #00B4D8;
+  --green: #10B981;
+  --orange: #F59E0B;
+  --red: #EF4444;
+  --light: #EFF6FF;
+  --lgray: #F8FAFC;
+  --mgray: #E2E8F0;
+  --dkgray: #64748B;
+  --text: #1E293B;
+  --white: #ffffff;
+  --border: #E2E8F0;
+  --radius: 10px;
+  --radius-sm: 6px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: #F0F4F8; color: var(--text); min-height: 100vh; }
+
+/* NAV */
+nav { background: var(--navy); padding: .85rem 2rem; display: flex; align-items: center; gap: 1rem; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,.18); }
+.nav-logo { color: #fff; font-weight: 700; font-size: 15px; letter-spacing: .02em; }
+.nav-logo span { color: var(--blue); }
+.nav-sub { color: rgba(255,255,255,.5); font-size: 12px; margin-left: auto; }
+.nav-badge { background: rgba(255,255,255,.1); color: rgba(255,255,255,.8); font-size: 11px; padding: 3px 10px; border-radius: 99px; border: 1px solid rgba(255,255,255,.15); }
+
+/* MAIN */
+main { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem; }
+
+/* TABS */
+.tabs { display: flex; gap: 4px; margin-bottom: 1.5rem; background: var(--white); border-radius: var(--radius); padding: 5px; box-shadow: 0 1px 3px rgba(0,0,0,.06); border: 1px solid var(--border); }
+.tab { flex: 1; padding: 9px 14px; border-radius: var(--radius-sm); border: none; background: transparent; cursor: pointer; font-size: 13px; font-weight: 500; color: var(--dkgray); transition: all .15s; }
+.tab.active { background: var(--navy); color: #fff; }
+.tab:hover:not(.active) { background: var(--lgray); }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* DROP ZONE */
+.drop-zone { border: 2px dashed var(--border); border-radius: var(--radius); padding: 3rem 2rem; text-align: center; cursor: pointer; transition: all .15s; background: var(--white); }
+.drop-zone:hover, .drop-zone.over { border-color: var(--blue); background: #F0F9FF; }
+.drop-icon { font-size: 40px; margin-bottom: 1rem; }
+.drop-label { font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: .4rem; }
+.drop-sub { font-size: 13px; color: var(--dkgray); margin-bottom: 1rem; }
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 20px; border-radius: var(--radius-sm); border: 1.5px solid var(--border); background: var(--white); cursor: pointer; font-size: 13px; font-weight: 600; color: var(--text); transition: all .15s; }
+.btn:hover { border-color: var(--navy); background: var(--lgray); }
+.btn-primary { background: var(--navy); color: #fff; border-color: var(--navy); }
+.btn-primary:hover { background: #003a7a; border-color: #003a7a; }
+.btn-danger { background: var(--red); color: #fff; border-color: var(--red); }
+.btn-danger:hover { opacity: .9; }
+input[type=file] { display: none; }
+
+/* VENDOR QUEUE */
+.queue { margin-top: 1.5rem; display: flex; flex-direction: column; gap: 8px; }
+.queue-item { display: flex; align-items: center; gap: 10px; padding: .7rem 1rem; background: var(--white); border-radius: var(--radius-sm); border: 1px solid var(--border); }
+.queue-item-name { flex: 1; font-size: 13px; font-weight: 500; }
+.queue-item-status { font-size: 12px; color: var(--dkgray); }
+.queue-item-rm { background: none; border: none; cursor: pointer; color: var(--dkgray); font-size: 16px; padding: 0 4px; }
+.queue-item-rm:hover { color: var(--red); }
+.queue-actions { display: flex; gap: 8px; margin-top: 1rem; flex-wrap: wrap; }
+
+/* CARDS */
+.card { background: var(--white); border-radius: var(--radius); border: 1px solid var(--border); padding: 1.25rem 1.5rem; margin-bottom: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,.04); }
+.card-title { font-size: 13px; font-weight: 600; color: var(--dkgray); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 1rem; }
+
+/* VENDOR HEADER */
+.vendor-header { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem; }
+.vendor-title { font-size: 22px; font-weight: 700; color: var(--navy); }
+.vendor-meta { font-size: 13px; color: var(--dkgray); margin-top: 3px; }
+.global-score { text-align: center; padding: .75rem 1.5rem; background: var(--lgray); border-radius: var(--radius-sm); border: 1px solid var(--border); min-width: 100px; }
+.global-score-val { font-size: 30px; font-weight: 700; }
+.global-score-label { font-size: 11px; color: var(--dkgray); text-transform: uppercase; letter-spacing: .05em; }
+
+/* PROGRESS */
+.progress-wrap { height: 8px; background: var(--mgray); border-radius: 99px; overflow: hidden; flex: 1; }
+.progress-fill { height: 100%; border-radius: 99px; transition: width .5s ease; }
+
+/* SECTION GRID */
+.sections-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; margin-bottom: 1rem; }
+.section-card { background: var(--white); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem 1.1rem; }
+.section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: .7rem; }
+.section-name { font-size: 13px; font-weight: 600; color: var(--text); flex: 1; line-height: 1.3; }
+.section-score { font-size: 18px; font-weight: 700; min-width: 48px; text-align: right; }
+.section-bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: .6rem; }
+.section-bar-label { font-size: 11px; color: var(--dkgray); min-width: 70px; }
+.mini-progress { height: 5px; background: var(--mgray); border-radius: 99px; overflow: hidden; flex: 1; }
+.mini-fill { height: 100%; border-radius: 99px; }
+
+/* PILLS */
+.pills { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: .5rem; }
+.pill { font-size: 11px; padding: 2px 8px; border-radius: 99px; font-weight: 600; }
+.pill-a { background: #D1FAE5; color: #065F46; }
+.pill-p { background: #FEF3C7; color: #92400E; }
+.pill-r { background: #DBEAFE; color: #1E40AF; }
+.pill-n { background: #FEE2E2; color: #991B1B; }
+.pill-nr { background: #F1F5F9; color: #64748B; }
+
+/* DETAIL TABLE */
+.toggle-btn { font-size: 12px; color: var(--dkgray); cursor: pointer; background: none; border: none; padding: 2px 0; display: flex; align-items: center; gap: 4px; }
+.toggle-btn:hover { color: var(--navy); }
+.detail-wrap { display: none; margin-top: .75rem; overflow-x: auto; }
+.detail-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.detail-table th { text-align: left; padding: 5px 8px; background: var(--lgray); color: var(--dkgray); font-weight: 600; border-bottom: 1px solid var(--border); }
+.detail-table td { padding: 5px 8px; border-bottom: 1px solid var(--border); vertical-align: top; color: var(--text); }
+.detail-table tr:last-child td { border-bottom: none; }
+.badge { font-size: 10px; padding: 2px 7px; border-radius: 99px; font-weight: 600; white-space: nowrap; display: inline-block; }
+.badge-a { background: #D1FAE5; color: #065F46; }
+.badge-p { background: #FEF3C7; color: #92400E; }
+.badge-r { background: #DBEAFE; color: #1E40AF; }
+.badge-n { background: #FEE2E2; color: #991B1B; }
+.badge-nr { background: #F1F5F9; color: #64748B; }
+
+/* COMPARISON TABLE */
+.compare-wrap { overflow-x: auto; }
+.compare-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 600px; }
+.compare-table th { background: var(--navy); color: #fff; padding: 10px 12px; text-align: left; font-weight: 600; font-size: 12px; white-space: nowrap; }
+.compare-table th.section-th { background: #003a7a; }
+.compare-table td { padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.compare-table tr:nth-child(even) td { background: var(--lgray); }
+.compare-table tr:hover td { background: #EFF6FF; }
+.score-cell { font-weight: 700; font-size: 14px; text-align: center; }
+.score-bar-cell { min-width: 80px; }
+.compare-bar { height: 6px; border-radius: 99px; margin-top: 3px; }
+.rank-badge { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; font-size: 11px; font-weight: 700; }
+.rank-1 { background: #FEF3C7; color: #92400E; }
+.rank-2 { background: #F1F5F9; color: #475569; }
+.rank-3 { background: #FEF3C7; color: #78350F; opacity: .7; }
+.rank-other { background: #F1F5F9; color: #94A3B8; }
+
+/* TOAST */
+.toast { position: fixed; bottom: 2rem; right: 2rem; background: var(--navy); color: #fff; padding: .75rem 1.25rem; border-radius: var(--radius-sm); font-size: 13px; font-weight: 500; z-index: 9999; box-shadow: 0 4px 16px rgba(0,0,0,.2); transition: opacity .3s; }
+
+/* EMPTY STATE */
+.empty { text-align: center; padding: 3rem 1rem; color: var(--dkgray); }
+.empty-icon { font-size: 36px; margin-bottom: .75rem; }
+.empty-label { font-size: 15px; font-weight: 500; }
+.empty-sub { font-size: 13px; margin-top: .35rem; }
+
+/* SECTION SELECTOR */
+.single-nav { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 1rem; }
+.snav-btn { padding: 5px 12px; font-size: 12px; border-radius: 99px; border: 1px solid var(--border); background: var(--white); cursor: pointer; font-weight: 500; color: var(--dkgray); }
+.snav-btn:hover { border-color: var(--navy); color: var(--navy); }
+.snav-btn.active { background: var(--navy); color: #fff; border-color: var(--navy); }
+
+/* TOP BAR WITH ACTIONS */
+.top-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .75rem; margin-bottom: 1.25rem; }
+.back-btn { font-size: 13px; color: var(--dkgray); background: none; border: none; cursor: pointer; display: flex; align-items: center; gap: 4px; }
+.back-btn:hover { color: var(--navy); }
+
+@media print { nav, .tabs, .queue-actions, .top-actions, .toggle-btn, .back-btn { display: none !important; } }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">ENGIE <span>·</span> RFI AIMS Scorer</div>
+  <div class="nav-sub">Responsible AI Team · Usage interne</div>
+  <div class="nav-badge" id="vendor-count-badge">0 vendor(s) chargé(s)</div>
+</nav>
+
+<main>
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('upload')">📂 Charger des réponses</button>
+    <button class="tab" onclick="switchTab('single')" id="tab-single" style="display:none">📋 Scoring individuel</button>
+    <button class="tab" onclick="switchTab('compare')" id="tab-compare" style="display:none">⚖️ Comparaison multi-vendors</button>
+    <button class="tab" onclick="switchTab('methodo')">📖 Méthodologie</button>
+  </div>
+
+  <!-- UPLOAD TAB -->
+  <div class="tab-panel active" id="panel-upload">
+    <div class="drop-zone" id="drop-zone">
+      <div class="drop-icon">📂</div>
+      <div class="drop-label">Glisser-déposer un ou plusieurs fichiers Excel vendors</div>
+      <div class="drop-sub">Format : ENGIE_AIMS_RFI_Response_Form complété · Plusieurs fichiers acceptés simultanément</div>
+      <button class="btn" onclick="document.getElementById('file-input').click()">Choisir des fichiers</button>
+      <input type="file" id="file-input" accept=".xlsx,.xls" multiple>
+    </div>
+
+    <div class="queue" id="vendor-queue"></div>
+
+    <div class="queue-actions" id="queue-actions" style="display:none">
+      <button class="btn btn-primary" onclick="viewSingle(0)">📋 Scoring individuel</button>
+      <button class="btn btn-primary" onclick="switchTab('compare')">⚖️ Comparer tous les vendors</button>
+      <button class="btn" onclick="exportAllPDF()">⬇️ Exporter tous les PDF</button>
+      <button class="btn btn-danger" onclick="clearAll()">🗑 Tout effacer</button>
+    </div>
+  </div>
+
+  <!-- SINGLE SCORING TAB -->
+  <div class="tab-panel" id="panel-single">
+    <div id="single-content"></div>
+  </div>
+
+  <!-- COMPARE TAB -->
+  <div class="tab-panel" id="panel-compare">
+    <div id="compare-content"></div>
+  </div>
+
+  <!-- METHODO TAB -->
+  <div class="tab-panel" id="panel-methodo">
+    <div class="card" style="margin-bottom:1rem">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:1.25rem">
+        <div style="width:44px;height:44px;border-radius:50%;background:#EFF6FF;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">📖</div>
+        <div>
+          <div style="font-size:18px;font-weight:700;color:#002D62">Méthodologie de scoring</div>
+          <div style="font-size:13px;color:#64748B;margin-top:2px">RFI AIMS Providers · ENGIE Responsible AI Team · Avril 2026</div>
+        </div>
+      </div>
+
+      <!-- STATUTS -->
+      <div style="margin-bottom:1.75rem">
+        <div class="card-title">1 · Statuts de réponse et valeurs associées</div>
+        <p style="font-size:13px;color:#64748B;margin-bottom:1rem;line-height:1.6">Chaque critère du fichier Excel vendor est noté selon le statut déclaré dans la colonne D. Quatre statuts sont possibles, correspondant chacun à une valeur numérique :</p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px">
+          <div style="padding:1rem;border-radius:8px;background:#D1FAE5;border:1px solid #6EE7B7">
+            <div style="font-size:22px;margin-bottom:.4rem">✅</div>
+            <div style="font-weight:700;color:#065F46;font-size:14px">Available</div>
+            <div style="font-size:12px;color:#047857;margin-top:4px">Fonctionnalité pleinement disponible dans la version actuelle du produit.</div>
+            <div style="font-size:24px;font-weight:800;color:#065F46;margin-top:.5rem">4 pts</div>
+          </div>
+          <div style="padding:1rem;border-radius:8px;background:#FEF3C7;border:1px solid #FCD34D">
+            <div style="font-size:22px;margin-bottom:.4rem">⚠️</div>
+            <div style="font-weight:700;color:#92400E;font-size:14px">Partially Available</div>
+            <div style="font-size:12px;color:#B45309;margin-top:4px">Fonctionnalité partiellement implémentée. Détails attendus en colonne E.</div>
+            <div style="font-size:24px;font-weight:800;color:#92400E;margin-top:.5rem">2 pts</div>
+          </div>
+          <div style="padding:1rem;border-radius:8px;background:#DBEAFE;border:1px solid #93C5FD">
+            <div style="font-size:22px;margin-bottom:.4rem">🗓️</div>
+            <div style="font-weight:700;color:#1E40AF;font-size:14px">Planned in Roadmap</div>
+            <div style="font-size:12px;color:#1D4ED8;margin-top:4px">Fonctionnalité planifiée. Date de livraison attendue en colonne E.</div>
+            <div style="font-size:24px;font-weight:800;color:#1E40AF;margin-top:.5rem">1 pt</div>
+          </div>
+          <div style="padding:1rem;border-radius:8px;background:#FEE2E2;border:1px solid #FCA5A5">
+            <div style="font-size:22px;margin-bottom:.4rem">❌</div>
+            <div style="font-weight:700;color:#991B1B;font-size:14px">Not Available</div>
+            <div style="font-size:12px;color:#B91C1C;margin-top:4px">Fonctionnalité non disponible et non planifiée dans la roadmap.</div>
+            <div style="font-size:24px;font-weight:800;color:#991B1B;margin-top:.5rem">0 pt</div>
+          </div>
+        </div>
+        <div style="margin-top:.75rem;padding:.75rem 1rem;background:#F8FAFC;border-radius:8px;border:1px solid #E2E8F0;font-size:12px;color:#64748B">
+          <strong style="color:#1E293B">Score section</strong> = (somme des points obtenus / maximum théorique) × 100 — exprimé en pourcentage. Le maximum théorique est de 4 pts × nombre de critères de la section.
+        </div>
+      </div>
+
+      <!-- PONDÉRATIONS -->
+      <div style="margin-bottom:1.75rem">
+        <div class="card-title">2 · Pondérations par section</div>
+        <p style="font-size:13px;color:#64748B;margin-bottom:1rem;line-height:1.6">Les sections ne sont pas toutes égales dans la grille de scoring. La pondération reflète leur importance stratégique et réglementaire pour ENGIE dans le cadre du déploiement d'un AIMS groupe.</p>
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:13px">
+            <thead>
+              <tr style="background:#002D62">
+                <th style="padding:10px 14px;text-align:left;color:#fff;font-weight:600;border-radius:8px 0 0 0">Section</th>
+                <th style="padding:10px 14px;text-align:center;color:#fff;font-weight:600">Nb critères</th>
+                <th style="padding:10px 14px;text-align:center;color:#fff;font-weight:600">Pondération</th>
+                <th style="padding:10px 14px;text-align:left;color:#fff;font-weight:600;border-radius:0 8px 0 0">Justification</th>
+              </tr>
+            </thead>
+            <tbody id="methodo-table-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- SCORE GLOBAL -->
+      <div style="margin-bottom:1.75rem">
+        <div class="card-title">3 · Calcul du score global pondéré</div>
+        <p style="font-size:13px;color:#64748B;margin-bottom:1rem;line-height:1.6">Le score global est une moyenne pondérée des scores de section. Il agrège la performance du vendor sur l'ensemble du périmètre fonctionnel évalué.</p>
+        <div style="padding:1.25rem;background:#EFF6FF;border-radius:8px;border:1px solid #BFDBFE;font-family:monospace;font-size:13px;color:#1E40AF;line-height:2">
+          Score global = Σ (Score_section × Poids_section) / Σ Poids_sections<br>
+          <span style="color:#64748B;font-family:'Segoe UI',sans-serif;font-size:12px">Exemple : (Score_IV × 2 + Score_III × 1.5 + Score_VII × 1.5 + Score_IX × 1.5 + Score_II × 1 + ...) / (2 + 1.5 + 1.5 + 1.5 + 1 + 1 + 1 + 1)</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:1rem">
+          <div style="padding:.9rem;background:#D1FAE5;border-radius:8px;text-align:center">
+            <div style="font-size:20px;font-weight:800;color:#065F46">≥ 75%</div>
+            <div style="font-size:12px;color:#047857;margin-top:4px;font-weight:600">Vert · Candidat fort</div>
+            <div style="font-size:11px;color:#065F46;margin-top:2px">Couverture fonctionnelle solide — à prioriser en shortlist</div>
+          </div>
+          <div style="padding:.9rem;background:#FEF3C7;border-radius:8px;text-align:center">
+            <div style="font-size:20px;font-weight:800;color:#92400E">50–74%</div>
+            <div style="font-size:12px;color:#B45309;margin-top:4px;font-weight:600">Orange · Candidat partiel</div>
+            <div style="font-size:11px;color:#92400E;margin-top:2px">Gaps identifiés — à évaluer selon roadmap et contexte</div>
+          </div>
+          <div style="padding:.9rem;background:#FEE2E2;border-radius:8px;text-align:center">
+            <div style="font-size:20px;font-weight:800;color:#991B1B">&lt; 50%</div>
+            <div style="font-size:12px;color:#B91C1C;margin-top:4px;font-weight:600">Rouge · Couverture insuffisante</div>
+            <div style="font-size:11px;color:#991B1B;margin-top:2px">Trop de critères absents — peu adapté au périmètre ENGIE</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LIMITES -->
+      <div>
+        <div class="card-title">4 · Limites et compléments humains requis</div>
+        <p style="font-size:13px;color:#64748B;margin-bottom:.75rem;line-height:1.6">Le scorer automatise le premier niveau d'analyse quantitative mais ne remplace pas le jugement de l'équipe RACI sur les points suivants :</p>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;gap:10px;padding:.75rem 1rem;background:#F8FAFC;border-radius:8px;border-left:3px solid #F59E0B">
+            <div style="font-size:16px">⚠️</div>
+            <div style="font-size:13px;color:#1E293B"><strong>Qualité des commentaires (col E)</strong> — Le score ne tient pas compte de la richesse ou de la pertinence des réponses libres. Un "Partially Available" avec un commentaire solide peut valoir autant qu'un "Available" sans détail.</div>
+          </div>
+          <div style="display:flex;gap:10px;padding:.75rem 1rem;background:#F8FAFC;border-radius:8px;border-left:3px solid #F59E0B">
+            <div style="font-size:16px">⚠️</div>
+            <div style="font-size:13px;color:#1E293B"><strong>Crédibilité des réponses</strong> — Les statuts sont déclarés par le vendor sans vérification tierce. L'équipe RACI doit challenger les "Available" sur les critères critiques (IV, VII, IX).</div>
+          </div>
+          <div style="display:flex;gap:10px;padding:.75rem 1rem;background:#F8FAFC;border-radius:8px;border-left:3px solid #F59E0B">
+            <div style="font-size:16px">⚠️</div>
+            <div style="font-size:13px;color:#1E293B"><strong>Section X (Vendor Profile)</strong> — Non intégrée au score global car elle contient des données qualitatives (pricing, références clients, maturité). Son analyse reste à la charge d'Edgar & Marie.</div>
+          </div>
+          <div style="display:flex;gap:10px;padding:.75rem 1rem;background:#F8FAFC;border-radius:8px;border-left:3px solid #3B82F6">
+            <div style="font-size:16px">ℹ️</div>
+            <div style="font-size:13px;color:#1E293B"><strong>Pondérations ajustables</strong> — Les poids actuels reflètent les priorités ENGIE au moment du lancement. Ils peuvent être réévalués par Chantal avant la consolidation finale du 23-24 avril.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+// ── CONFIG ──────────────────────────────────────────────────────────────
+const SECTIONS = [
+  {key:"II",  label:"II · Users & Roles",          sheet:"II. Users & Roles",          w:1.0},
+  {key:"III", label:"III · AI Inventory",           sheet:"III. AI Inventory & Lifecycle", w:1.5},
+  {key:"IV",  label:"IV · Compliance & Risk",       sheet:"IV. Compliance & Risk",      w:2.0},
+  {key:"V",   label:"V · Reporting & Dashboards",   sheet:"V. Reporting & Dashboards",  w:1.0},
+  {key:"VI",  label:"VI · Intégration IS",          sheet:"VI. Integration & IS",       w:1.0},
+  {key:"VII", label:"VII · Auditabilité",           sheet:"VII. Audit & Traceability",  w:1.5},
+  {key:"VIII",label:"VIII · Workflow",              sheet:"VIII. Workflow Management",  w:1.0},
+  {key:"IX",  label:"IX · Sécurité & Certifs",      sheet:"IX. Security & Certifications", w:1.5},
+];
+const PROFILE_SHEET = "X. Vendor Profile";
+
+const SCORE_VAL = {available:4, partial:2, roadmap:1, not_available:0};
+
+// ── STATE ───────────────────────────────────────────────────────────────
+let vendors = [];      // parsed vendor objects
+let currentVendorIdx = 0;
+
+// ── PARSING ─────────────────────────────────────────────────────────────
+function normalizeStatus(v) {
+  if (!v) return null;
+  const s = String(v).toLowerCase().replace(/[✅⚠️❌🗓️]/g,"").replace(/\s+/g," ").trim();
+  if (s.includes("not avail")) return "not_available";
+  if (s.includes("partial"))   return "partial";
+  if (s.includes("roadmap") || s.includes("planned")) return "roadmap";
+  if (s.includes("avail"))     return "available";
+  return null;
+}
+
+function parseVendor(file, wb) {
+  const info = {name:"", solution:"", contact:"", email:""};
+  const instr = wb.Sheets["📋 Instructions"];
+  if (instr) {
+    const rows = XLSX.utils.sheet_to_json(instr, {header:1, defval:""});
+    rows.forEach(r => {
+      const k = String(r[1]||"");
+      if (k.includes("Company Name"))   info.name     = String(r[3]||"").trim();
+      if (k.includes("Solution"))       info.solution = String(r[3]||"").trim();
+      if (k.includes("Contact Person")) info.contact  = String(r[3]||"").trim();
+      if (k.includes("Email"))          info.email    = String(r[3]||"").trim();
+    });
+  }
+  const displayName = info.name || info.solution || file.name.replace(/\.xlsx?$/i,"");
+
+  const sectionResults = [];
+  let totalW = 0, totalWS = 0;
+
+  SECTIONS.forEach(sec => {
+    const ws = wb.Sheets[sec.sheet];
+    const items = [];
+    const counts = {available:0, partial:0, roadmap:0, not_available:0, noresponse:0};
+    let total = 0, max = 0;
+
+    if (ws) {
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:""});
+      rows.forEach(r => {
+        if (typeof r[0] !== "number") return;
+        const ref     = String(r[1]||"");
+        const req     = String(r[2]||"");
+        const status  = normalizeStatus(r[3]);
+        const comment = String(r[4]||"").trim();
+        const sc = status ? SCORE_VAL[status] : 0;
+        total += sc; max += 4;
+        if (status) counts[status]++;
+        else counts.noresponse++;
+        items.push({ref, req, status: status||"noresponse", score:sc, comment});
+      });
+    }
+
+    const pct = max > 0 ? Math.round((total/max)*100) : null;
+    if (pct !== null) { totalWS += pct * sec.w; totalW += sec.w; }
+    sectionResults.push({...sec, score:pct, items, counts});
+  });
+
+  // Profile
+  const profileItems = [];
+  const profileWS = wb.Sheets[PROFILE_SHEET];
+  if (profileWS) {
+    const rows = XLSX.utils.sheet_to_json(profileWS, {header:1, defval:""});
+    rows.forEach(r => {
+      if (typeof r[0] !== "number") return;
+      profileItems.push({ref:String(r[1]||""), req:String(r[2]||""), answer:String(r[3]||"").trim()});
+    });
+  }
+
+  const globalScore = totalW > 0 ? Math.round(totalWS/totalW) : 0;
+  return {displayName, info, sectionResults, profileItems, globalScore, fileName:file.name};
+}
+
+// ── COLOR HELPERS ────────────────────────────────────────────────────────
+function scoreColor(pct) {
+  if (pct >= 75) return "#10B981";
+  if (pct >= 50) return "#F59E0B";
+  if (pct >= 25) return "#EF4444";
+  return "#94A3B8";
+}
+
+function pillCls(s) {
+  return {available:"pill-a", partial:"pill-p", roadmap:"pill-r", not_available:"pill-n", noresponse:"pill-nr"}[s]||"pill-nr";
+}
+function pillLabel(s) {
+  return {available:"Dispo", partial:"Partiel", roadmap:"Roadmap", not_available:"Absent", noresponse:"N/R"}[s]||"N/R";
+}
+function badgeCls(s) {
+  return {available:"badge-a", partial:"badge-p", roadmap:"badge-r", not_available:"badge-n", noresponse:"badge-nr"}[s]||"badge-nr";
+}
+
+// ── FILE HANDLING ────────────────────────────────────────────────────────
+function handleFiles(files) {
+  Array.from(files).forEach(file => {
+    if (!file.name.match(/\.xlsx?$/i)) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const wb = XLSX.read(e.target.result, {type:"array"});
+        const v = parseVendor(file, wb);
+        // avoid duplicates by filename
+        if (!vendors.find(x => x.fileName === v.fileName)) {
+          vendors.push(v);
+          renderQueue();
+          updateBadge();
+          showToast(`✓ ${v.displayName} chargé`);
+        } else {
+          showToast(`⚠ ${v.fileName} déjà chargé`);
+        }
+      } catch(err) {
+        showToast(`✗ Erreur : ${file.name}`);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function renderQueue() {
+  const q = document.getElementById("vendor-queue");
+  const qa = document.getElementById("queue-actions");
+  if (!vendors.length) { q.innerHTML=""; qa.style.display="none"; return; }
+  qa.style.display = "flex";
+
+  q.innerHTML = vendors.map((v,i) => `
+    <div class="queue-item">
+      <span style="font-size:18px">📄</span>
+      <div class="queue-item-name">${v.displayName}</div>
+      <div class="queue-item-status" style="color:${scoreColor(v.globalScore)};font-weight:600">${v.globalScore}%</div>
+      <div class="queue-item-status">${v.sectionResults.length} sections</div>
+      <button class="btn" style="padding:5px 12px;font-size:12px" onclick="viewSingle(${i})">Voir scoring</button>
+      <button class="btn" style="padding:5px 10px;font-size:12px" onclick="exportPDF(${i})">PDF</button>
+      <button class="queue-item-rm" onclick="removeVendor(${i})" title="Retirer">✕</button>
+    </div>
+  `).join("");
+
+  // show tabs
+  document.getElementById("tab-single").style.display = "";
+  if (vendors.length >= 2) document.getElementById("tab-compare").style.display = "";
+}
+
+function removeVendor(i) {
+  vendors.splice(i, 1);
+  renderQueue();
+  updateBadge();
+  if (!vendors.length) {
+    document.getElementById("tab-single").style.display = "none";
+    document.getElementById("tab-compare").style.display = "none";
+    switchTab("upload");
+  }
+}
+
+function clearAll() {
+  vendors = [];
+  renderQueue();
+  updateBadge();
+  document.getElementById("tab-single").style.display = "none";
+  document.getElementById("tab-compare").style.display = "none";
+  switchTab("upload");
+}
+
+function updateBadge() {
+  document.getElementById("vendor-count-badge").textContent = `${vendors.length} vendor(s) chargé(s)`;
+}
+
+// ── SINGLE SCORING VIEW ──────────────────────────────────────────────────
+function viewSingle(idx) {
+  currentVendorIdx = idx;
+  renderSingleView(idx);
+  switchTab("single");
+}
+
+function renderSingleView(idx) {
+  const v = vendors[idx];
+  const gc = scoreColor(v.globalScore);
+  const navBtns = vendors.map((vv, i) =>
+    `<button class="snav-btn ${i===idx?"active":""}" onclick="viewSingle(${i})">${vv.displayName}</button>`
+  ).join("");
+
+  let html = `
+  <div class="top-actions">
+    <button class="back-btn" onclick="switchTab('upload')">← Retour</button>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="exportPDF(${idx})">⬇️ Exporter PDF</button>
+      ${vendors.length>=2?`<button class="btn" onclick="switchTab('compare')">⚖️ Comparer</button>`:""}
+    </div>
+  </div>`;
+
+  if (vendors.length > 1) {
+    html += `<div class="single-nav">${navBtns}</div>`;
+  }
+
+  html += `
+  <div class="card" id="vendor-summary-${idx}">
+    <div class="vendor-header">
+      <div>
+        <div class="vendor-title">${v.displayName}</div>
+        <div class="vendor-meta">${v.info.contact ? v.info.contact+" · ":""}${v.info.email||""}</div>
+      </div>
+      <div class="global-score">
+        <div class="global-score-val" style="color:${gc}">${v.globalScore}%</div>
+        <div class="global-score-label">Score global pondéré</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;margin-top:.5rem">
+      <div class="progress-wrap">
+        <div class="progress-fill" style="width:${v.globalScore}%;background:${gc}"></div>
+      </div>
+      <span style="font-size:13px;font-weight:600;color:${gc};min-width:40px">${v.globalScore}%</span>
+    </div>
+  </div>
+
+  <div class="sections-grid">`;
+
+  v.sectionResults.forEach((sec, si) => {
+    const sc = sec.score ?? 0;
+    const bc = scoreColor(sc);
+    const total = Object.values(sec.counts).reduce((a,b)=>a+b,0);
+    html += `
+    <div class="section-card">
+      <div class="section-header">
+        <div class="section-name">${sec.label}</div>
+        <div class="section-score" style="color:${bc}">${sc}%</div>
+      </div>
+      <div class="section-bar-row">
+        <div class="mini-progress"><div class="mini-fill" style="width:${sc}%;background:${bc}"></div></div>
+      </div>
+      <div class="pills">
+        ${sec.counts.available    ? `<span class="pill pill-a">${sec.counts.available} dispo</span>` : ""}
+        ${sec.counts.partial      ? `<span class="pill pill-p">${sec.counts.partial} partiel</span>` : ""}
+        ${sec.counts.roadmap      ? `<span class="pill pill-r">${sec.counts.roadmap} roadmap</span>` : ""}
+        ${sec.counts.not_available? `<span class="pill pill-n">${sec.counts.not_available} absent</span>` : ""}
+        ${sec.counts.noresponse   ? `<span class="pill pill-nr">${sec.counts.noresponse} N/R</span>` : ""}
+      </div>
+      <button class="toggle-btn" onclick="toggleDetail(this)">▶ Détail (${total} critères)</button>
+      <div class="detail-wrap">
+        <table class="detail-table">
+          <tr><th style="width:60px">Réf.</th><th>Critère</th><th style="width:90px">Statut</th><th>Commentaire vendor</th></tr>
+          ${sec.items.map(it => `
+          <tr>
+            <td style="color:var(--dkgray);white-space:nowrap">${it.ref}</td>
+            <td>${it.req.length>70?it.req.slice(0,70)+"…":it.req}</td>
+            <td><span class="badge ${badgeCls(it.status)}">${pillLabel(it.status)}</span></td>
+            <td style="color:var(--dkgray)">${it.comment.length>80?it.comment.slice(0,80)+"…":it.comment}</td>
+          </tr>`).join("")}
+        </table>
+      </div>
+    </div>`;
+  });
+  html += `</div>`;
+
+  // Profile
+  if (v.profileItems.length) {
+    const filled = v.profileItems.filter(p=>p.answer&&p.answer!=="—").length;
+    html += `
+    <div class="card">
+      <div class="card-title">X · Vendor Profile — ${filled}/${v.profileItems.length} champs renseignés</div>
+      <button class="toggle-btn" onclick="toggleDetail(this)">▶ Afficher le profil complet</button>
+      <div class="detail-wrap">
+        <table class="detail-table">
+          <tr><th style="width:60px">Réf.</th><th>Question</th><th>Réponse vendor</th></tr>
+          ${v.profileItems.map(p=>`<tr><td style="color:var(--dkgray)">${p.ref}</td><td>${p.req}</td><td style="color:var(--dkgray)">${p.answer||"—"}</td></tr>`).join("")}
+        </table>
+      </div>
+    </div>`;
+  }
+
+  document.getElementById("single-content").innerHTML = html;
+}
+
+function toggleDetail(btn) {
+  const wrap = btn.nextElementSibling;
+  const open = wrap.style.display === "block";
+  wrap.style.display = open ? "none" : "block";
+  btn.innerHTML = btn.innerHTML.replace(open?"▼":"▶", open?"▶":"▼");
+}
+
+// ── COMPARISON VIEW ──────────────────────────────────────────────────────
+function renderCompareView() {
+  if (vendors.length < 2) {
+    document.getElementById("compare-content").innerHTML = `
+      <div class="empty"><div class="empty-icon">⚖️</div>
+      <div class="empty-label">Chargez au moins 2 vendors pour comparer</div></div>`;
+    return;
+  }
+
+  // sort by global score desc
+  const sorted = [...vendors].sort((a,b) => b.globalScore - a.globalScore);
+
+  let html = `
+  <div class="top-actions">
+    <button class="back-btn" onclick="switchTab('upload')">← Retour</button>
+    <button class="btn btn-primary" onclick="exportComparePDF()">⬇️ Exporter comparatif PDF</button>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Classement global — ${vendors.length} vendors</div>
+    <div class="compare-wrap">
+    <table class="compare-table">
+      <tr>
+        <th>#</th>
+        <th>Vendor</th>
+        <th>Score global</th>
+        ${SECTIONS.map(s=>`<th class="section-th">${s.key}</th>`).join("")}
+      </tr>
+      ${sorted.map((v, rank) => {
+        const gc = scoreColor(v.globalScore);
+        const rankBadge = rank===0?`<span class="rank-badge rank-1">1</span>`:
+                          rank===1?`<span class="rank-badge rank-2">2</span>`:
+                          rank===2?`<span class="rank-badge rank-3">3</span>`:
+                          `<span class="rank-badge rank-other">${rank+1}</span>`;
+        return `<tr>
+          <td>${rankBadge}</td>
+          <td style="font-weight:600">${v.displayName}</td>
+          <td class="score-cell score-bar-cell">
+            <span style="color:${gc};font-size:15px">${v.globalScore}%</span>
+            <div class="compare-bar" style="width:${v.globalScore}%;background:${gc}"></div>
+          </td>
+          ${SECTIONS.map(sec => {
+            const sr = v.sectionResults.find(s=>s.key===sec.key);
+            const pct = sr?.score ?? 0;
+            const bc = scoreColor(pct);
+            return `<td class="score-cell" style="color:${bc}">${pct}%</td>`;
+          }).join("")}
+        </tr>`;
+      }).join("")}
+    </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Légende pondération des sections</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:12px;color:var(--dkgray)">
+      ${SECTIONS.map(s=>`<span style="background:var(--lgray);padding:4px 10px;border-radius:99px;border:1px solid var(--border)">${s.label} <strong style="color:var(--navy)">×${s.w}</strong></span>`).join("")}
+    </div>
+  </div>`;
+
+  document.getElementById("compare-content").innerHTML = html;
+}
+
+// ── PDF EXPORT ───────────────────────────────────────────────────────────
+function exportPDF(idx) {
+  const v = vendors[idx];
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation:"portrait", unit:"mm", format:"a4" });
+  const W = 210, M = 15;
+
+  // Header
+  doc.setFillColor(0,45,98);
+  doc.rect(0,0,W,22,`F`);
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(14); doc.setFont("helvetica","bold");
+  doc.text("ENGIE · RFI AIMS Providers — Scoring Vendor", M, 10);
+  doc.setFontSize(9); doc.setFont("helvetica","normal");
+  doc.text("Responsible AI Team · Usage interne · " + new Date().toLocaleDateString("fr-FR"), M, 17);
+
+  let y = 30;
+  doc.setTextColor(0,45,98);
+  doc.setFontSize(16); doc.setFont("helvetica","bold");
+  doc.text(v.displayName, M, y); y += 6;
+  doc.setFontSize(10); doc.setFont("helvetica","normal");
+  doc.setTextColor(100,116,139);
+  if (v.info.contact) doc.text(v.info.contact + (v.info.email?" · "+v.info.email:""), M, y);
+  y += 10;
+
+  // Global score box
+  const gc = v.globalScore >= 75 ? [16,185,129] : v.globalScore >= 50 ? [245,158,11] : [239,68,68];
+  doc.setFillColor(...gc);
+  doc.roundedRect(M, y, 50, 16, 3, 3, "F");
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(18); doc.setFont("helvetica","bold");
+  doc.text(`${v.globalScore}%`, M+25, y+11, {align:"center"});
+  doc.setFontSize(8); doc.setFont("helvetica","normal");
+  doc.text("Score global pondéré", M+25, y+15.5, {align:"center"});
+  y += 24;
+
+  // Sections
+  doc.setTextColor(100,116,139);
+  doc.setFontSize(9); doc.setFont("helvetica","bold");
+  doc.text("SCORES PAR SECTION", M, y); y += 5;
+
+  v.sectionResults.forEach(sec => {
+    if (y > 260) { doc.addPage(); y = 20; }
+    const sc = sec.score ?? 0;
+    const bc = sc>=75?[16,185,129]:sc>=50?[245,158,11]:[239,68,68];
+
+    doc.setFillColor(245,248,250);
+    doc.roundedRect(M, y, W-2*M, 12, 2, 2, "F");
+    doc.setTextColor(30,41,59);
+    doc.setFontSize(9); doc.setFont("helvetica","bold");
+    doc.text(sec.label, M+3, y+7);
+
+    // mini bar
+    doc.setFillColor(226,232,240);
+    doc.roundedRect(130, y+4, 55, 4, 2, 2, "F");
+    doc.setFillColor(...bc);
+    doc.roundedRect(130, y+4, Math.max(1,(55*sc/100)), 4, 2, 2, "F");
+
+    doc.setTextColor(...bc);
+    doc.setFont("helvetica","bold"); doc.setFontSize(10);
+    doc.text(`${sc}%`, 190, y+8, {align:"right"});
+
+    // pills summary
+    doc.setFont("helvetica","normal"); doc.setFontSize(7.5);
+    doc.setTextColor(100,116,139);
+    const pills = [
+      sec.counts.available    ? `${sec.counts.available} dispo`   : null,
+      sec.counts.partial      ? `${sec.counts.partial} partiel`   : null,
+      sec.counts.roadmap      ? `${sec.counts.roadmap} roadmap`   : null,
+      sec.counts.not_available? `${sec.counts.not_available} abs` : null,
+    ].filter(Boolean).join("  ·  ");
+    if(pills) doc.text(pills, M+3, y+11);
+    y += 14;
+  });
+
+  y += 4;
+  doc.setTextColor(100,116,139); doc.setFontSize(8);
+  doc.text(`Généré le ${new Date().toLocaleDateString("fr-FR")} · ENGIE Responsible AI Team`, M, y);
+
+  doc.save(`ENGIE_RFI_Scoring_${v.displayName.replace(/\s+/g,"_")}.pdf`);
+  showToast(`PDF exporté : ${v.displayName}`);
+}
+
+function exportAllPDF() {
+  vendors.forEach((_, i) => exportPDF(i));
+}
+
+function exportComparePDF() {
+  const { jsPDF } = window.jspdf;
+  const sorted = [...vendors].sort((a,b) => b.globalScore - a.globalScore);
+  const doc = new jsPDF({ orientation:"landscape", unit:"mm", format:"a4" });
+  const W = 297, M = 12;
+
+  doc.setFillColor(0,45,98);
+  doc.rect(0,0,W,20,"F");
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(13); doc.setFont("helvetica","bold");
+  doc.text("ENGIE · RFI AIMS Providers — Comparatif Multi-Vendors", M, 9);
+  doc.setFontSize(9); doc.setFont("helvetica","normal");
+  doc.text(`${vendors.length} vendors analysés · ${new Date().toLocaleDateString("fr-FR")} · Responsible AI Team`, M, 16);
+
+  let y = 28;
+  const colW = Math.min(30, (W - 2*M - 60 - 25) / SECTIONS.length);
+
+  // Header row
+  doc.setFillColor(0,58,122); doc.rect(M, y, W-2*M, 8, "F");
+  doc.setTextColor(255,255,255); doc.setFontSize(8); doc.setFont("helvetica","bold");
+  doc.text("#", M+3, y+5.5);
+  doc.text("Vendor", M+12, y+5.5);
+  doc.text("Global", M+55, y+5.5);
+  SECTIONS.forEach((s, i) => doc.text(s.key, M+80+i*colW+colW/2, y+5.5, {align:"center"}));
+  y += 10;
+
+  sorted.forEach((v, rank) => {
+    if (y > 185) { doc.addPage(); y = 20; }
+    const bg = rank%2===0 ? [248,250,252] : [255,255,255];
+    doc.setFillColor(...bg);
+    doc.rect(M, y, W-2*M, 9, "F");
+
+    doc.setTextColor(30,41,59); doc.setFontSize(9);
+    doc.setFont("helvetica","bold");
+    doc.text(`${rank+1}`, M+3, y+6);
+    doc.text(v.displayName.length>22 ? v.displayName.slice(0,22)+"…" : v.displayName, M+12, y+6);
+
+    const gc = v.globalScore>=75?[16,185,129]:v.globalScore>=50?[245,158,11]:[239,68,68];
+    doc.setTextColor(...gc);
+    doc.text(`${v.globalScore}%`, M+55+12, y+6, {align:"center"});
+
+    // bar
+    doc.setFillColor(226,232,240);
+    doc.rect(M+55, y+5.5, 22, 2.5, "F");
+    doc.setFillColor(...gc);
+    doc.rect(M+55, y+5.5, Math.max(0.5, 22*v.globalScore/100), 2.5, "F");
+
+    SECTIONS.forEach((sec, i) => {
+      const sr = v.sectionResults.find(s=>s.key===sec.key);
+      const pct = sr?.score ?? 0;
+      const bc = pct>=75?[16,185,129]:pct>=50?[245,158,11]:[239,68,68];
+      doc.setFont("helvetica","normal");
+      doc.setTextColor(...bc);
+      doc.text(`${pct}%`, M+80+i*colW+colW/2, y+6, {align:"center"});
+    });
+    y += 9;
+  });
+
+  y += 6;
+  doc.setTextColor(100,116,139); doc.setFontSize(8); doc.setFont("helvetica","normal");
+  doc.text("Pondération : IV Compliance ×2, III Inventory ×1.5, VII Audit ×1.5, IX Sécurité ×1.5, autres ×1", M, y);
+
+  doc.save("ENGIE_RFI_Comparatif_MultiVendors.pdf");
+  showToast("Comparatif PDF exporté !");
+}
+
+// ── UI HELPERS ───────────────────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+  document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+  document.getElementById("panel-"+name).classList.add("active");
+  const idx = {upload:0,single:1,compare:2,methodo:3}[name];
+  document.querySelectorAll(".tab")[idx]?.classList.add("active");
+  if (name==="compare") renderCompareView();
+  if (name==="methodo") renderMethodoTable();
+}
+
+function renderMethodoTable() {
+  const tbody = document.getElementById("methodo-table-body");
+  if (!tbody || tbody.dataset.rendered) return;
+  tbody.dataset.rendered = "1";
+  const SECTION_META = [
+    {label:"II · Users, Roles & Operating Model", n:10, w:1.0, why:"Fonctionnel de base — structurant mais non différenciant"},
+    {label:"III · AI Inventory & Lifecycle",       n:25, w:1.5, why:"Cœur opérationnel de l'AIMS — inventaire et cycle de vie"},
+    {label:"IV · Compliance, Risk & Frameworks",   n:24, w:2.0, why:"⭐ Priorité max — EU AI Act, ISO 42001, GPAI, risk scoring"},
+    {label:"V · Reporting & Dashboards",           n:18, w:1.0, why:"Pilotage governance — important mais non différenciant"},
+    {label:"VI · Intégration IS ENGIE",            n:18, w:1.0, why:"Intégration OKTA, API REST — nécessaire, faisable en projet"},
+    {label:"VII · Auditability & Traceability",    n:20, w:1.5, why:"Exigence réglementaire forte — traçabilité pour audits externes"},
+    {label:"VIII · Workflow Management",           n:19, w:1.0, why:"Efficacité opérationnelle — configurable post-déploiement"},
+    {label:"IX · Security & Certifications",       n:23, w:1.5, why:"ISO 27001, SOC2, RGPD, hébergement EU — non négociable"},
+  ];
+  const totalW = SECTION_META.reduce((s,r)=>s+r.w, 0);
+  tbody.innerHTML = SECTION_META.map((s,i) => {
+    const bg = i%2===0?"#F8FAFC":"#ffffff";
+    const wc = s.w===2.0?"#991B1B":s.w===1.5?"#92400E":"#1E40AF";
+    const wb2 = s.w===2.0?"#FEE2E2":s.w===1.5?"#FEF3C7":"#DBEAFE";
+    const pct = Math.round((s.w/totalW)*100);
+    return `<tr style="background:${bg}">
+      <td style="padding:9px 14px;font-weight:600;color:#1E293B">${s.label}</td>
+      <td style="padding:9px 14px;text-align:center;color:#64748B">${s.n}</td>
+      <td style="padding:9px 14px;text-align:center">
+        <span style="background:${wb2};color:${wc};padding:3px 12px;border-radius:99px;font-weight:700;font-size:13px">×${s.w}</span>
+        <div style="font-size:11px;color:#94A3B8;margin-top:3px">${pct}% du score global</div>
+      </td>
+      <td style="padding:9px 14px;font-size:12px;color:#64748B">${s.why}</td>
+    </tr>`;
+  }).join("") + `<tr style="background:#EFF6FF;font-weight:700">
+    <td style="padding:9px 14px;color:#002D62">Total</td>
+    <td style="padding:9px 14px;text-align:center;color:#002D62">${SECTION_META.reduce((s,r)=>s+r.n,0)} critères</td>
+    <td style="padding:9px 14px;text-align:center;color:#002D62">Σ ${totalW}</td>
+    <td style="padding:9px 14px;font-size:12px;color:#64748B">Section X (Vendor Profile) exclue du score automatique</td>
+  </tr>`;
+}
+
+function showToast(msg) {
+  const t = document.createElement("div");
+  t.className = "toast"; t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(()=>{ t.style.opacity="0"; setTimeout(()=>t.remove(),300); }, 2500);
+}
+
+// ── DRAG & DROP ──────────────────────────────────────────────────────────
+const dz = document.getElementById("drop-zone");
+dz.addEventListener("dragover", e => { e.preventDefault(); dz.classList.add("over"); });
+dz.addEventListener("dragleave", () => dz.classList.remove("over"));
+dz.addEventListener("drop", e => {
+  e.preventDefault(); dz.classList.remove("over");
+  handleFiles(e.dataTransfer.files);
+});
+document.getElementById("file-input").addEventListener("change", e => {
+  handleFiles(e.target.files);
+  e.target.value = "";
+});
+</script>
+</body>
+</html>
